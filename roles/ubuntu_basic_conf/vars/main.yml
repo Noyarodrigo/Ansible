@@ -1,0 +1,9 @@
+---
+# vars file for ubuntu
+hostname: host1
+user_name: 
+user_password: 
+#paquetes en formato lista (como en python)
+#paquetes: ['paquete1','paquete2,..., 'paqueteN']
+paquetes: ['htop','ntp', 'ntpdate']
+

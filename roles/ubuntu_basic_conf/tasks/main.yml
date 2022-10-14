@@ -1,0 +1,94 @@
+---
+# tasks file for ubuntu
+- name: Update hostname
+  shell: sed -i 's/preserve_hostname{{":"}} false/preserve_hostname{{":"}} true/g' /etc/cloud/cloud.cfg
+
+- name: Set hostname
+  ansible.builtin.hostname:
+    name: "{{hostname}}"
+
+- name: Restart systemd-logind
+  ansible.builtin.service:
+    name: systemd-logind
+    state: restarted
+
+- name: SSH Server 
+  lineinfile:
+    name: /etc/ssh/ssh_config
+    line: "ServerAliveInterval 5"
+    state: present
+
+- name: insertar UseDNS no en ssh_config
+  lineinfile:
+    name: /etc/ssh/ssh_config
+    line: "UseDNS no "
+
+- name: crear usuario
+  ansible.builtin.user:
+    name: "{{ user_name }}"
+    password: "{{ user_password }}"
+    update_password: on_create
+  when: user_name is defined and user_name != ''
+
+- name: Agregar user a sudo
+  ansible.builtin.shell: 
+    cmd: usermod -aG sudo "{{ user_name }}"
+
+#Root sólo con key 
+- name: Descomentar PermitRootLogin
+  lineinfile:
+    name: /etc/ssh/sshd_config
+    regexp: "#PermitRootLogin"
+    line: "PermitRootLogin without-password #"
+    state: present
+
+- name: Restart SSH
+  service:
+    name: ssh
+    state: restarted
+
+- name: Apt Update
+  apt:
+    update_cache: yes
+    force_apt_get: yes
+    cache_valid_time: 3600
+
+- name: Upgrade all packages on servers
+  apt:
+    upgrade: dist
+    force_apt_get: yes
+
+  #instalar lista de paquetes, modificar en paquetes.yaml  
+- name: Instalar Lista de paquetes
+  ansible.builtin.package:
+    name: "{{ paquetes }}"
+    state: present
+  when: paquetes is defined and paquetes != ''
+
+- name: Editor x defecto Vi.basic
+  shell: update-alternatives --set editor /usr/bin/vim.basic
+
+- name: Configurar zona horaria/hora
+  shell: |
+    timedatectl set-timezone America/Argentina/Mendoza
+    service ntp stop
+    ntpdate ar.pool.ntp.org
+    service ntp restart
+
+- name: Desactivar ipv6 (sysctl.conf)
+  lineinfile:
+    #insertar varias lineas con el loop
+    name: /etc/sysctl.conf
+    line: "{{ item }}"
+  loop:
+    - "net.ipv6.conf.all.disable_ipv6 = 1 "
+    - "net.ipv6.conf.default.disable_ipv6 = 1 "
+    - "net.ipv6.conf.lo.disable_ipv6 = 1 "
+
+- name: Desactivar ipv6 (/etc/gai.conf)
+  lineinfile:
+    name: /etc/gai.conf
+    line: "precedence ::ffff:0:0/96 100"
+    
+- name: Reboot
+  ansible.builtin.reboot:
